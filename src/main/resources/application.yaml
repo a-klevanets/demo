@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: demo
+  datasource:
+    url: jdbc:mysql://localhost:3306/appdb?createDatabaseIfNotExist=true
+    username: appuser
+    password: secret
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+  security:
+    oauth2:
+      authorizationserver:
+        client:
+          nextjs-client:
+            registration:
+              client-id: nextjs-client
+              client-authentication-methods:
+                - none
+              authorization-grant-types:
+                - authorization_code
+              redirect-uris:
+                - http://localhost:3000/api/auth/callback
+                - http://frontend:3000/api/auth/callback
+              scopes:
+                - openid
+                - profile
+                - users.read
+              require-authorization-consent: false
+              require-proof-key: true
+            token:
+              access-token-time-to-live: 1h
+        login-page: /login
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+    com.example.demo: DEBUG
