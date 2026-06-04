@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.RoleDto;
+import com.example.demo.entity.Permission;
 import com.example.demo.entity.Role;
 import com.example.demo.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,7 @@ public class RoleController {
 
 	private RoleDto toDto(Role role) {
 		List<String> perms = role.getPermissions().stream()
-				.map(p -> p.getName())
+				.map(Permission::getName)
 				.collect(Collectors.toList());
 		return new RoleDto(role.getId(), role.getName(), perms);
 	}
