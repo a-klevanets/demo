@@ -25,13 +25,14 @@ public class UserController {
         return userRepository.findAllWithRoleAndPermissions().stream()
                 .map(user -> {
                     String roleName = user.getRole() != null ? user.getRole().getName() : null;
+                    Long roleId = user.getRole() != null ? user.getRole().getId() : null;
                     List<String> perms = List.of();
                     if (user.getRole() != null && user.getRole().getPermissions() != null) {
                         perms = user.getRole().getPermissions().stream()
                                 .map(Permission::getName)
                                 .collect(Collectors.toList());
                     }
-                    return new UserDto(user.getId(), user.getUsername(), roleName, perms);
+                    return new UserDto(user.getId(), user.getUsername(), roleId, roleName, perms);
                 })
                 .collect(Collectors.toList());
     }
