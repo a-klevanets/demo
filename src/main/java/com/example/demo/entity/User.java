@@ -2,7 +2,6 @@ package com.example.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import com.example.demo.entity.Role;
 
 @Entity
 @Table(name = "users")
