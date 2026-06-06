@@ -13,7 +13,7 @@ public class LiquibaseConfig {
         SpringLiquibase liquibase = new SpringLiquibase();
         liquibase.setDataSource(dataSource);
         liquibase.setChangeLog("classpath:db/changelog/db.changelog-master.yaml");
-        // optional settings
+        liquibase.setDropFirst(true);
         liquibase.setShouldRun(true);
         return liquibase;
     }

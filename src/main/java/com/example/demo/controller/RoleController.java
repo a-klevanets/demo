@@ -1,47 +1,52 @@
 package com.example.demo.controller;
 
+import com.example.demo.core.rest.Expandable;
+import com.example.demo.core.rest.RequestContext;
 import com.example.demo.dto.RoleDto;
-import com.example.demo.entity.Permission;
-import com.example.demo.entity.Role;
 import com.example.demo.repository.RoleRepository;
+import com.example.demo.search.RoleSpecificationBuilder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/roles")
 @RequiredArgsConstructor
 public class RoleController {
 
-	private final RoleRepository roleRepository;
+    private final RequestContext requestContext;
+    private final RoleRepository roleRepository;
 
-	@GetMapping
-	@Transactional(readOnly = true)
-	public List<RoleDto> listRoles() {
-		return roleRepository.findAll().stream()
-				.map(this::toDto)
-				.collect(Collectors.toList());
-	}
+    @GetMapping
+    @Expandable
+    public Page<RoleDto> listRoles(
+            @RequestParam Map<String, String> filters,
+            Pageable pageable
+    ) {
+        var builder = new RoleSpecificationBuilder();
+        var specification = Specification.allOf(
+                builder.buildFiltersSpecification(filters),
+                builder.buildFetchSpecification(RoleDto.class, requestContext, true)
+        );
 
-	@GetMapping("/{id}")
-	@Transactional(readOnly = true)
-	public RoleDto getRole(@PathVariable("id") Long id) {
-		Role role = roleRepository.findById(id).orElseThrow();
-		return toDto(role);
-	}
+        return roleRepository.findAll(specification, pageable)
+                .map(entity -> new RoleDto(entity, requestContext.getExpandTree()));
+    }
 
-	private RoleDto toDto(Role role) {
-		List<String> perms = role.getPermissions().stream()
-				.map(Permission::getName)
-				.collect(Collectors.toList());
-		return new RoleDto(role.getId(), role.getName(), perms);
-	}
+    @GetMapping("/{id}")
+    @Expandable
+    public RoleDto getRole(@PathVariable("id") Long id) {
+        var builder = new RoleSpecificationBuilder();
+        var role = roleRepository.findOne(Specification.allOf(
+                    RoleRepository.withId(id),
+                    builder.buildFetchSpecification(RoleDto.class, requestContext, false)
+                ))
+                .orElseThrow(() -> new RuntimeException("Role not found"));
+
+        return new RoleDto(role, requestContext.getExpandTree());
+    }
 }
-
-

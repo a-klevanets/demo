@@ -2,17 +2,23 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
+interface RoleDto {
+  id: number;
+  name: string;
+  permissions?: string[];
+}
+
 interface UserDto {
   id: number;
   username: string;
   roleId?: number | null;
-  role?: string | null;
+  role?: RoleDto | string | null;
   permissions?: string[];
 }
 
 async function fetchUsers(token: string): Promise<UserDto[]> {
   const apiUrl = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-  const res = await fetch(`${apiUrl}/api/users`, {
+  const res = await fetch(`${apiUrl}/api/users?expand=role`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -23,7 +29,25 @@ async function fetchUsers(token: string): Promise<UserDto[]> {
     return [];
   }
 
-  return res.json();
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.content ?? []);
+}
+
+async function fetchRoles(token: string): Promise<RoleDto[]> {
+  const apiUrl = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+  const res = await fetch(`${apiUrl}/api/roles?expand=permissions`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return [];
+  }
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.content ?? []);
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams?: { view?: string; roleId?: string } }) {
@@ -34,6 +58,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   }
 
   const users = await fetchUsers(token);
+  const roles = await fetchRoles(token);
+  const rolesMap = new Map(roles.map((r) => [r.id, r]));
+
   // `searchParams` can be a Promise in some Next.js runtime configurations; unwrap if necessary
   let sp = searchParams as any;
   if (sp && typeof sp.then === "function") {
@@ -41,15 +68,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   }
   const view = sp?.view;
   const selectedRoleId = sp?.roleId ? Number(sp.roleId) : undefined;
-
-  // derive roles map from users
-  const rolesMap = new Map<number, { id: number; name: string; permissions: string[] }>();
-  for (const u of users) {
-    if (!u.roleId) continue;
-    if (!rolesMap.has(u.roleId)) {
-      rolesMap.set(u.roleId, { id: u.roleId, name: u.role || "", permissions: u.permissions || [] });
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -74,15 +92,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
                 <h2 className="text-lg font-semibold text-gray-900">Roles</h2>
                 <p className="text-sm text-gray-500">List of roles with permissions</p>
               </div>
-              {Array.from(rolesMap.values()).length === 0 ? (
+              {roles.length === 0 ? (
                 <div className="px-6 py-12 text-center text-gray-400">No roles found</div>
               ) : (
                 <ul className="divide-y">
-                  {Array.from(rolesMap.values()).map((role) => (
+                  {roles.map((role) => (
                     <li key={role.id} className="px-6 py-4 hover:bg-gray-50 flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{role.name}</div>
-                        <div className="text-xs text-gray-500">{role.permissions.join(', ')}</div>
+                        <div className="text-xs text-gray-500">{(role.permissions ?? []).join(', ')}</div>
                       </div>
                       <a href={`/dashboard?view=roles&roleId=${role.id}`} className="text-sm text-blue-600 hover:underline">View</a>
                     </li>
@@ -104,7 +122,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
                   <div className="px-6 py-6">
                     <h3 className="text-lg font-medium">{role.name}</h3>
                     <ul className="mt-4 space-y-2">
-                      {role.permissions.map((p) => (
+                      {(role.permissions ?? []).map((p) => (
                         <li key={p} className="text-sm text-gray-700">• {p}</li>
                       ))}
                     </ul>
@@ -143,9 +161,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
                         </td>
                         <td className="px-6 py-4">
                           {user.roleId ? (
-                            <a href={`/dashboard?view=roles&roleId=${user.roleId}`} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{user.role}</a>
+                            <a href={`/dashboard?view=roles&roleId=${user.roleId}`} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{typeof user.role === "object" && user.role ? user.role.name : (user.role ?? "")}</a>
                           ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{user.role}</span>
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{typeof user.role === "object" && user.role ? user.role.name : (user.role ?? "")}</span>
                           )}
                         </td>
                       </tr>

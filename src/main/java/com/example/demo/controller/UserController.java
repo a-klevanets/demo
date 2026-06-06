@@ -1,39 +1,52 @@
 package com.example.demo.controller;
 
+import com.example.demo.core.rest.Expandable;
+import com.example.demo.core.rest.RequestContext;
 import com.example.demo.dto.UserDto;
-import com.example.demo.entity.Permission;
 import com.example.demo.repository.UserRepository;
+import com.example.demo.search.UserSpecificationBuilder;
 import lombok.RequiredArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class UserController {
 
+    private final RequestContext requestContext;
     private final UserRepository userRepository;
 
     @GetMapping("/users")
-    @Transactional(readOnly = true)
-    public List<UserDto> getUsers() {
-        return userRepository.findAllWithRoleAndPermissions().stream()
-                .map(user -> {
-                    String roleName = user.getRole() != null ? user.getRole().getName() : null;
-                    Long roleId = user.getRole() != null ? user.getRole().getId() : null;
-                    List<String> perms = List.of();
-                    if (user.getRole() != null && user.getRole().getPermissions() != null) {
-                        perms = user.getRole().getPermissions().stream()
-                                .map(Permission::getName)
-                                .collect(Collectors.toList());
-                    }
-                    return new UserDto(user.getId(), user.getUsername(), roleId, roleName, perms);
-                })
-                .collect(Collectors.toList());
+    @Expandable
+    public Page<UserDto> getUsers(
+            @RequestParam Map<String, String> filters,
+            Pageable pageable
+    ) {
+        var builder = new UserSpecificationBuilder();
+        var specification = Specification.allOf(
+                builder.buildFiltersSpecification(filters),
+                builder.buildFetchSpecification(UserDto.class, requestContext, true)
+        );
+
+        return userRepository.findAll(specification, pageable)
+                .map(entity -> new UserDto(entity, requestContext.getExpandTree()));
+    }
+
+    @GetMapping("/users/{id}")
+    @Expandable
+    public UserDto getUserById(@PathVariable Long id) {
+        var builder = new UserSpecificationBuilder();
+        var user = userRepository.findOne(Specification.allOf(
+                    UserRepository.withId(id),
+                    builder.buildFetchSpecification(UserDto.class, requestContext, false)
+                ))
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        return new UserDto(user, requestContext.getExpandTree());
     }
 }
